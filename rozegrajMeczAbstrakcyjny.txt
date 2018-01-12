@@ -1,0 +1,123 @@
+delimiter //
+CREATE PROCEDURE rozegrajMeczAbstrakcyjny(IN klub1 varchar(50),IN klub2 varchar(50),IN log varchar(20)) 
+BEGIN
+	DECLARE rozgrywki varchar(50);
+    DECLARE punktyZ1 int;
+    DECLARE punktyZ2 int;
+    DECLARE bramki1 int;
+    DECLARE bramki2 int;
+    DECLARE ID1 int;
+    DECLARE ID2 int;
+    DECLARE liga1 varchar(30);
+    DECLARE liga2 varchar(30);
+    DECLARE powtorka3 varchar(50);
+    DECLARE powtorka4 varchar(50);
+     DECLARE zespol int;
+    DECLARE done INT DEFAULT 0;
+    DECLARE pozycja INT DEFAULT 1;
+    DECLARE cur CURSOR FOR SELECT * FROM test_prepare_vw;
+ 	DECLARE CONTINUE HANDLER FOR NOT FOUND SET done=1;
+
+SET powtorka3 = (SELECT ID FROM zespoly WHERE nazwa=klub1);
+        IF powtorka3 IS NOT null THEN 
+SET powtorka4 = (SELECT ID FROM zespoly WHERE nazwa=klub2);
+        IF powtorka4 IS NOT null THEN 
+
+	SET rozgrywki = CONCAT(log,'_leauge');
+    SET ID1 = (SELECT ID FROM zespoly where nazwa=klub1);
+    SET ID2 = (SELECT ID FROM zespoly where nazwa=klub2);
+
+SET @query = CONCAT("CREATE VIEW test_prepare_vw as select ID_zespolu FROM ", rozgrywki," ORDER BY punkty DESC, bilans_bramkowy DESC");
+select @query; 
+PREPARE stmt from @query; 
+EXECUTE stmt; 
+DEALLOCATE PREPARE stmt; 
+	 
+    SET liga1 = (SELECT liga FROM zespoly where nazwa=klub1);
+    SET liga2 = (SELECT liga FROM zespoly where nazwa=klub2);
+
+
+
+        IF liga1='Ekstraklasa' THEN
+        	SET bramki1 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM ekstraklasa WHERE ID_zespolu=ID1 ))/5)+2));
+          
+        ELSEIF liga1='Ligue 1' THEN
+        	SET bramki1 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM ligue_1  WHERE ID_zespolu=ID1 ))/5)+2));
+           
+        ELSEIF liga1='Bundesliga' THEN
+        	SET bramki1 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM bundesliga WHERE ID_zespolu=ID1 ))/5)+2));
+            
+        ELSEIF liga1='La Liga' THEN
+        	SET bramki1 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM la_liga  WHERE ID_zespolu=ID1 ))/5)+2));
+            
+        ELSEIF liga1='Serie A' THEN
+        	SET bramki1 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM serie_a WHERE ID_zespolu=ID1 ))/5)+2));
+           
+        ELSEIF liga1='Premier Leauge' THEN
+        	SET bramki1 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM premier_leauge WHERE ID_zespolu=ID1 ))/5)+2));
+            
+        END IF;
+
+IF liga2='Ekstraklasa' THEN
+        	SET bramki2 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM ekstraklasa WHERE ID_zespolu=ID2 ))/5)+2));
+           
+        ELSEIF liga2='Ligue 1' THEN
+        	SET bramki2 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM ligue_1  WHERE ID_zespolu=ID2 ))/5)+2));
+            
+        ELSEIF liga2='Bundesliga' THEN
+        	SET bramki2 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM bundesliga WHERE ID_zespolu=ID2 ))/5)+2));
+            
+        ELSEIF liga2='La Liga' THEN
+        	SET bramki2 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM la_liga  WHERE ID_zespolu=ID2 ))/5)+2));
+        
+        ELSEIF liga2='Serie A' THEN
+        	SET bramki2 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM serie_a WHERE ID_zespolu=ID2 ))/5)+2));
+        ELSEIF liga2='Premier Leauge' THEN
+        	SET bramki2 = FLOOR(rand()*(((21-(SELECT pozycja_w_tabeli FROM premier_leauge WHERE ID_zespolu=ID2 ))/5)+2));
+           
+        END IF;
+
+	IF bramki1 > bramki2 THEN
+    	SET punktyZ1 = 3;
+        SET punktyZ2 = 0;
+    ELSEIF bramki1 < bramki2 THEN
+    	SET punktyZ1 = 0;
+        SET punktyZ2 = 3;
+    ELSEIF bramki1 = bramki2 THEN
+    	SET punktyZ1 = 1;
+        SET punktyZ2 = 1;
+    END IF;
+    
+      INSERT INTO mecze_abstrakcyjne VALUES (null,CURDATE(),ID1,bramki1,bramki2,ID2,rozgrywki);
+
+SET @str = CONCAT("UPDATE ", rozgrywki ," SET rozegrane_mecze=rozegrane_mecze+1, bramki_strzelone=bramki_strzelone+ ", bramki1 ,", bramki_stracone=bramki_stracone- ", bramki2 ,", bilans_bramkowy=bilans_bramkowy + ", bramki1 ," - ", bramki2 ,", punkty=punkty + ", punktyZ1 ," WHERE ID_zespolu= ", ID1);
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @str = CONCAT("UPDATE ", rozgrywki ," SET rozegrane_mecze=rozegrane_mecze+1, bramki_strzelone=bramki_strzelone+ ", bramki2 ,", bramki_stracone=bramki_stracone- ", bramki1 ,", bilans_bramkowy=bilans_bramkowy + ", bramki2 ," - ", bramki1 ,", punkty=punkty + ", punktyZ2 ," WHERE ID_zespolu= ", ID2);
+PREPARE stmt FROM @str;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+OPEN cur;
+FETCH cur INTO zespol;
+    	WHILE done=0 DO
+            SET @zespol=(SELECT zespol);
+    		SET @pozycja=(SELECT pozycja);
+    		SET @pol = CONCAT("UPDATE ", rozgrywki ," SET pozycja_w_tabeli=",@pozycja," WHERE ID_zespolu=",@zespol);
+    		PREPARE stmt FROM @pol;
+			EXECUTE stmt;
+ 			DEALLOCATE PREPARE stmt;
+        	
+        	SET pozycja=pozycja+1;
+            FETCH cur INTO zespol;	
+    	END WHILE;
+    CLOSE cur; 
+	DROP VIEW test_prepare_vw;  
+
+
+end IF;
+end IF;
+    END    //
+delimiter ;
